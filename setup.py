@@ -10,6 +10,6 @@ setup(name='gpy',
       url='',
       packages=find_packages(),
       entry_points = {
-        'console_scripts' : ['gpy=gpy.main:main']
+        'console_scripts' : ['gpy=gpy.main:cli']
       }
 )

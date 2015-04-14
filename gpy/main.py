@@ -173,6 +173,7 @@ def qdel():
 @click.option('--user', '-u')
 @click.option('--password', '-p')
 def download(path, host, user, password):
+    '''Download a GROMACS project via SSH'''
     from .ssh import SSHSession
 
     sub = True
@@ -201,7 +202,7 @@ def download(path, host, user, password):
     if sub:
         prev = os.getcwd()
         os.chdir(os.path.basename(path))
-    
+
     config = _conf()
     if not config.has_section('main'):
         config.add_section('main')
@@ -238,6 +239,60 @@ def _get_template(tplname, path='.'):
     os.chdir(prev)
     return template
 
+@main.group()
+def remote():
+    pass
+
+@remote.command()
+@click.option('--host', '-h')
+@click.option('--user', '-u')
+@click.option('--password', '-p')
+def qstat(host, user, password):
+    '''Download a GROMACS project via SSH'''
+    from .ssh import SSHSession
+    import paramiko
+
+    # Connect
+    host = host or _get_conf('host')
+    u = user or _get_conf('user')
+    p = password or _get_conf('password')
+    s = paramiko.SSHClient()
+    s.load_system_host_keys()
+    s.connect(host, 22, u, p)
+    command = 'qstat -u %s' % u
+    (stdin, stdout, stderr) = s.exec_command(command)
+    for line in stdout.readlines():
+        click.echo(click.style(line, bg='black'), nl=False)
+    for line in stderr.readlines():
+        click.echo(click.style(line, fg='yellow'), nl=False)
+    click.echo('')
+    s.close()
+
+
+def isroot(dir):
+    return os.path.abspath(dir) == os.path.abspath(os.path.join(dir, '..'))
+
+def _get_template(tplname, path='.'):
+    prev = os.getcwd()
+    if path != None:
+       os.chdir(path)
+
+    tplpath = os.path.join('templates', tplname)
+
+    # Base case 1 -- found
+    if os.path.exists(tplpath):
+       click.echo(click.style('USING: Template %s' % os.path.abspath(tplpath), fg='green'))
+       template = open(tplpath).read()
+    # Base case 2 -- not found
+    elif not _checkproject() or isroot('.'):
+       template = None
+       click.echo('ERROR: Template not found.')
+    # Base case 3 -- recursive case
+    else:
+       template = _get_template(tplname, '..')
+
+    os.chdir(prev)
+    return template
 @main.command()
 def minimize():
     pass
@@ -278,6 +333,6 @@ def _conf():
     return config
 
 
-
+cli = main
 if __name__ == '__main__':
-    main()
+    cli()
