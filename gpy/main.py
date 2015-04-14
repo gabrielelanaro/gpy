@@ -32,7 +32,9 @@ def list_(path=None):
     path = path if path else '.'
 
     os.chdir(path)
-    _checkproject()
+    if not _checkproject():
+        return
+
     for root, dirs, files in os.walk('.'):
         if '.gpy' in files:
             click.echo(root)
@@ -108,6 +110,8 @@ def config(key, value):
 def _checkproject():
     if not os.path.exists('.gpy'):
         click.echo(click.style("ERROR: You are not in a gpy project.", fg='red'))
+        return False
+    return True
 
 def _get_conf(key):
     configfile = os.path.expanduser('~/.gypconf')
