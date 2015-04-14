@@ -214,6 +214,14 @@ def download(path, host, user, password):
     if sub:
         os.chdir(prev)
 
+@main.command()
+def status(dir):
+    if not _checkfile():
+        return
+
+    # Read the logfile
+    
+
 def isroot(dir):
     return os.path.abspath(dir) == os.path.abspath(os.path.join(dir, '..'))
 
