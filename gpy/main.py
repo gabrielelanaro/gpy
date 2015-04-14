@@ -117,34 +117,34 @@ def config(key, value):
 @click.option('--yes', is_flag=True)
 @click.option('--no', is_flag=True)
 def qsub(name, time, cpus, email, yes, no):
-    
+
     if not _checkproject():
         return
 
     template = _get_template('qsub.tpl')
     config = _conf()
-    
+
     if template is None:
         return
 
     if email is None:
         email = _get_conf('email')
-    
+
     time = time if time is not None else config.get('qsub', 'time')
     name = name if name is not None else config.get('qsub', 'name')
     cpus = cpus if cpus is not None else config.get('qsub', 'cpus')
-    
+
     render = template.format(name=name, time=time, cpus=cpus, email=email)
     with open('sub.pbs', 'w') as fd:
         fd.write(render)
-    
+
     click.echo('WRITTEN: sub.pbs')
     ret = subprocess.check_output(['qsub', 'sub.pbs'])
     click.echo('INFO: Created job %s' % ret)
 
     if not config.has_section('qsub'):
         config.add_section('qsub')
-    
+
     config.set('qsub', 'job', ret)
 
     if no:
@@ -154,7 +154,7 @@ def qsub(name, time, cpus, email, yes, no):
         config.set('qsub', 'cpus', cpus)
         config.set('qsub', 'time', time)
         click.echo('WRITTEN: default settings')
-    
+
     with open(config.filename, 'w') as fd:
         config.write(fd)
 
@@ -166,7 +166,53 @@ def qdel():
     exitcode = os.system('qdel %s' % job)
     if exitcode == 0:
         click.echo(click.style('SUCCESS: Job %s successfully removed.' % job, fg='green'))
+
+@main.command()
+@click.argument('path', required=False)
+@click.option('--host', '-h')
+@click.option('--user', '-u')
+@click.option('--password', '-p')
+def download(path, host, user, password):
+    from .ssh import SSHSession
+
+    sub = True
+    if path == None:
+        sub = False
+        if _checkproject(True):
+            config = _conf()
+            path = config.get('main', 'remote')
+        else:
+            click.echo('ERROR: path argument is required.')
+            return
+
+
+    # Connect
+    host = host or _get_conf('host')
+    u = user or _get_conf('user')
+    p = password or _get_conf('password')
+
+    sess = SSHSession(host, username=u, password=p)
+    def cb(dir, file):
+        click.echo('DOWNLOADING: %s' % file)
+
+    outpath = '.' if sub else '..'
+    sess.get_all(path, outpath, callback=cb)
+
+    if sub:
+        prev = os.getcwd()
+        os.chdir(os.path.basename(path))
     
+    config = _conf()
+    if not config.has_section('main'):
+        config.add_section('main')
+    config.set('main', 'remote', path)
+    config.write(open(config.filename, 'w'))
+
+    click.echo('DONE')
+
+    if sub:
+        os.chdir(prev)
+
 def isroot(dir):
     return os.path.abspath(dir) == os.path.abspath(os.path.join(dir, '..'))
 
@@ -208,9 +254,10 @@ def run():
     #TODO
     os.system('mdrun_mpi_d -v')
 
-def _checkproject():
+def _checkproject(mute=False):
     if not os.path.exists('.gpy'):
-        click.echo(click.style("ERROR: You are not in a gpy project.", fg='red'))
+        if not mute:
+            click.echo(click.style("ERROR: You are not in a gpy project.", fg='red'))
         return False
     return True
 
@@ -226,11 +273,11 @@ def _conf():
     configfile = '.gpy'
     config = SafeConfigParser()
     config.read(configfile)
-    
+
     config.filename = configfile
     return config
 
-    
+
 
 if __name__ == '__main__':
     main()

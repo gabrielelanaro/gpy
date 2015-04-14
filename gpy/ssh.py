@@ -101,14 +101,14 @@ class SSHSession(object):
                 folders.append(f.filename)
             else:
                 files.append(f.filename)
-        print (path,folders,files)
+
         yield path,folders,files
         for folder in folders:
             new_path=os.path.join(remotepath,folder)
             for x in self.sftp_walk(new_path):
                 yield x
 
-    def get_all(self,remotepath,localpath):
+    def get_all(self,remotepath,localpath, callback=None):
         #  recursively download a full directory
         #  Harder than it sounded at first, since paramiko won't walk
         #
@@ -127,7 +127,10 @@ class SSHSession(object):
             except:
                 pass
             for file in walker[2]:
+                if callback is not None:
+                    callback(walker[0], file)
                 self.get(os.path.join(walker[0],file),os.path.join(localpath,walker[0],file))
+
     def write_command(self,text,remotefile):
         #  Writes text to remotefile, and makes remotefile executable.
         #  This is perhaps a bit niche, but I was thinking I needed it.
