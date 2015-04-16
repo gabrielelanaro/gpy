@@ -215,15 +215,24 @@ def download(path, host, user, password):
         os.chdir(prev)
 
 @main.command()
-def status(dir):
-    if not _checkfile():
+def status():
+    from logfile import Logfile
+
+    if not _checkproject():
         return
 
     # Read the logfile
-    
+    if not os.path.exists('md.log'):
+        click.echo('No logfile found')
+    else:
+        lf = Logfile.parse('md.log')
+        click.echo(repr(lf))
+
 
 def isroot(dir):
     return os.path.abspath(dir) == os.path.abspath(os.path.join(dir, '..'))
+
+
 
 def _get_template(tplname, path='.'):
     prev = os.getcwd()
