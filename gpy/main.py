@@ -114,9 +114,8 @@ def config(key, value):
 @click.option('--time', '-t')
 @click.option('--cpus', '-c')
 @click.option('--email', '-e')
-@click.option('--yes', is_flag=True)
-@click.option('--no', is_flag=True)
-def qsub(name, time, cpus, email, yes, no):
+@click.option('--genonly', is_flag=True)
+def submit(name, time, cpus, email, genonly):
 
     if not _checkproject():
         return
@@ -129,7 +128,12 @@ def qsub(name, time, cpus, email, yes, no):
 
     if email is None:
         email = _get_conf('email')
-
+    
+    if not config.has_section('qsub') and not all([time, cpus, name]):
+        click.echo('ERROR: No qsub configuration found:')
+        click.echo('Please provide options --time --cpus --name')
+        return
+     
     time = time if time is not None else config.get('qsub', 'time')
     name = name if name is not None else config.get('qsub', 'name')
     cpus = cpus if cpus is not None else config.get('qsub', 'cpus')
@@ -139,21 +143,21 @@ def qsub(name, time, cpus, email, yes, no):
         fd.write(render)
 
     click.echo('WRITTEN: sub.pbs')
-    ret = subprocess.check_output(['qsub', 'sub.pbs'])
-    click.echo('INFO: Created job %s' % ret)
-
+    click.echo('USING: time=%s | name=%s | cpus=%s' % (time, name, cpus))
+    
     if not config.has_section('qsub'):
         config.add_section('qsub')
-
-    config.set('qsub', 'job', ret)
-
-    if no:
-        pass
-    elif yes or click.confirm('Do you want to save the settings for next time?'):
-        config.set('qsub', 'name', name)
-        config.set('qsub', 'cpus', cpus)
-        config.set('qsub', 'time', time)
-        click.echo('WRITTEN: default settings')
+    
+    config.set('qsub', 'time', time)
+    config.set('qsub', 'name', name)
+    config.set('qsub', 'cpus', cpus)
+    
+    if not genonly:
+        ret = subprocess.check_output(['qsub', 'sub.pbs'])
+        click.echo('INFO: Created job %s' % ret)
+        config.set('qsub', 'job', ret)
+    else:
+        click.echo('INFO: Job not submitted')
 
     with open(config.filename, 'w') as fd:
         config.write(fd)
@@ -325,6 +329,22 @@ def compile():
 def run():
     #TODO
     os.system('mdrun_mpi_d -v')
+
+@main.command()
+@click.option('--deep', '-d', is_flag=True)
+@click.option('--preview', '-p', is_flag=True)
+def clean(deep, preview):
+    patterns = ['#*']
+    if deep:
+        patterns.extend(['traj.xtc', 'traj.trr', 'topol.tpr', 'md.log', 'state*.cpt', 'state.trr'])
+    
+    torm = sum((glob.glob(pattern) for pattern in patterns), [])
+    if preview:
+        click.echo('INFO: The following files can be removed:')
+        click.echo(' '.join(torm))
+    else:
+        click.echo('REMOVING: ' + ' '.join(torm))
+    	[os.remove(file) for file in torm]
 
 def _checkproject(mute=False):
     if not os.path.exists('.gpy'):
